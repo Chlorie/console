@@ -3,12 +3,19 @@
 #include <cinttypes>
 #include <cstdio>
 
-#if __has_include(<conio.h>)
-#   define CNSL_HAS_CONIO
-#   include <conio.h>
-#elif __has_include(<termios.h>)
-#   define CNSL_HAS_TERMIOS
-#   include <termios.h>
+#ifdef _WIN32
+#   if !__has_include(<conio.h>)
+#       error Cannot find <conio.h> for Windows
+#   else
+#       include <conio.h>
+#       include <Windows.h>
+#   endif
+#else // Assume *nix
+#   if !__has_include(<termios.h>) || !__has_include(<sys/ioctl.h>)
+#       error Cannot find <termios.h> or <sys/ioctl.h> for *nix
+#   else
+#       include <termios.h>
+#       include <sys/ioctl.h>
 namespace
 {
     template <typename Func>
@@ -25,12 +32,27 @@ namespace
         return result;
     }
 }
-#else
-#   error Cannot find <conio.h> or <termios.h> for getch()
+#   endif
 #endif
 
 namespace cnsl
 {
+    console_size get_console_size()
+    {
+#ifdef _WIN32
+        CONSOLE_SCREEN_BUFFER_INFO info;
+        GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
+        return {
+            static_cast<size_t>(info.srWindow.Bottom - info.srWindow.Top + 1),
+            static_cast<size_t>(info.srWindow.Right - info.srWindow.Left + 1)
+        };
+#else
+        winsize size{};
+        ioctl(0, TIOCGWINSZ, &size);
+        return { size.ws_row, size.ws_col };
+#endif
+    }
+
     void cursor_up(const size_t amount) { std::printf("\x1b[%zuA", amount); }
     void cursor_down(const size_t amount) { std::printf("\x1b[%zuB", amount); }
     void cursor_forward(const size_t amount) { std::printf("\x1b[%zuC", amount); }
@@ -82,27 +104,27 @@ namespace cnsl
 
     int getch()
     {
-#ifdef CNSL_HAS_CONIO
+#ifdef _WIN32
         return _getch();
-#elif defined(CNSL_HAS_TERMIOS)
+#else
         return in_raw_mode(std::getchar);
 #endif
     }
 
     int getche()
     {
-#ifdef CNSL_HAS_CONIO
+#ifdef _WIN32
         return _getche();
-#elif defined(CNSL_HAS_TERMIOS)
+#else
         return in_raw_mode(std::getchar, true);
 #endif
     }
 
     void ungetch(const int ch)
     {
-#ifdef CNSL_HAS_CONIO
+#ifdef _WIN32
         (void)_ungetch(ch);
-#elif defined(CNSL_HAS_TERMIOS)
+#else
         (void)in_raw_mode([ch] { return std::ungetc(ch, stdin); });
 #endif
     }

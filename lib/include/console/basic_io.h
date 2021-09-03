@@ -9,6 +9,14 @@ namespace cnsl
     using std::uint8_t;
     using std::uint32_t;
 
+    struct console_size
+    {
+        size_t height = 0;
+        size_t width = 0;
+    };
+
+    console_size get_console_size();
+
     void cursor_up(size_t amount = 1);
     void cursor_down(size_t amount = 1);
     void cursor_forward(size_t amount = 1);
